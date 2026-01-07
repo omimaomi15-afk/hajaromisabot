@@ -11,7 +11,6 @@ from telegram.ext import (
     ContextTypes,
     ChatMemberHandler
 )
-
 # =========================
 # 🔐 الإعدادات
 # =========================
@@ -104,12 +103,15 @@ async def send_adhan(app, prayer):
 async def send_salat(app):
     try:
         image_path = os.path.join("images", "salat.png")
+
         await app.bot.send_photo(
             chat_id=CHAT_ID,
             photo=open(image_path, "rb"),
             caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
         )
+
         print("✅ الصلاة على النبي أُرسلت مع صورة واحدة")
+
     except Exception as e:
         print("⚠️ خطأ الصلاة:", e)
 
@@ -119,6 +121,7 @@ async def send_salat(app):
 async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     old_status = update.chat_member.old_chat_member.status
     new_status = update.chat_member.new_chat_member.status
+
     if old_status in ("left", "kicked") and new_status == "member":
         user = update.chat_member.new_chat_member.user
         text = random.choice(WELCOME_MESSAGES).format(
@@ -133,50 +136,48 @@ async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
-        await update.message.reply_text("🧕 الحاجة روميصة راهي تخدم 🤍")
+        await update.message.reply_text(
+            "🧕 الحاجة روميصة راهي تخدم 🤍"
+        )
 
 # =========================
-# 🕒 جدولة أذان يومي
+# 🔄 عند تشغيل البوت
 # =========================
-async def adhan_loop(app):
+async def on_startup(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-    async def schedule_adhan():
-        prayers = get_prayer_times()
-        for prayer, time_str in prayers.items():
-            hour, minute = map(int, time_str.split(":"))
-            scheduler.add_job(send_adhan, "cron", hour=hour, minute=minute, args=[app, prayer])
-    await schedule_adhan()
+
+    # إرسال الصلاة على النبي فور التشغيل
+    await send_salat(app)
+
+    # جدولة الأذان
+    prayers = get_prayer_times()
+    for prayer, time_str in prayers.items():
+        hour, minute = map(int, time_str.split(":"))
+        scheduler.add_job(send_adhan, "cron", hour=hour, minute=minute, args=[app, prayer])
+
+    # جدولة الصلاة على النبي كل ساعة
+    scheduler.add_job(send_salat, "interval", hours=1, args=[app])
     scheduler.start()
 
-# =========================
-# 🕒 تحديث أوقات الأذان يومياً
-# =========================
-async def update_prayers_daily():
-    while True:
-        await asyncio.sleep(24*3600)  # كل يوم
-        print("🔄 تحديث أوقات الأذان اليومية")
-        # إعادة جدولة الأذان جديدة
-        # سيتم أخذ أوقات جديدة من get_prayer_times عند الدورة التالية
+    print("🟢 البوت يعمل بثبات")
 
 # =========================
 # 🚀 التشغيل
 # =========================
-def main():
+async def runner():
     app = ApplicationBuilder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
 
+    # تشغيل المهام الخلفية بدون post_init
+    asyncio.create_task(on_startup(app))
+
     print("🤖 Bot is running...")
+    await app.run_polling()
 
-    # تشغيل مهام الخلفية
-    async def run_startup_tasks():
-        await send_salat(app)
-        asyncio.create_task(adhan_loop(app))
-        asyncio.create_task(update_prayers_daily())
-        print("🟢 البوت يعمل بثبات")
-
-    asyncio.run(run_startup_tasks())
-    app.run_polling()
+def main():
+    asyncio.run(runner())
 
 if __name__ == "__main__":
     main()
