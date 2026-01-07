@@ -14,8 +14,8 @@ from telegram.constants import ParseMode
 # =========================
 # 🔐 الإعدادات
 # =========================
-TOKEN = os.getenv("7924726725:AAFHAA_KbuNQEXf_AnS3V14ivINGUVCkNkc")
-CHAT_ID = int(os.getenv("-1003614623008"))
+TOKEN = os.getenv("TOKEN")       # TOKEN هو اسم المتغير في Render
+CHAT_ID = int(os.getenv("CHAT_ID"))
 
 CITY = "Algiers"
 COUNTRY = "DZ"
@@ -223,3 +223,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
