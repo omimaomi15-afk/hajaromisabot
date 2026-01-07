@@ -208,19 +208,19 @@ async def on_startup(app):
 # 🚀 التشغيل
 # =========================
 def main():
-    app = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .post_init(on_startup)
-        .build()
-    )
+    import asyncio
+    from telegram.ext import Application
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
+    async def runner():
+        app = Application.builder().token(TOKEN).post_init(on_startup).build()
 
-    print("🤖 Bot is running...")
-    app.run_polling()
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
 
-if __name__ == "__main__":
-    main()
+        print("🤖 Bot is running...")
+        await app.run_polling()
+
+    asyncio.run(runner())
+
+
 
