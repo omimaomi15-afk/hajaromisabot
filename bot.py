@@ -1,0 +1,225 @@
+import random
+import requests
+import os
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    ChatMemberHandler
+)
+from telegram.constants import ParseMode
+
+# =========================
+# 🔐 الإعدادات
+# =========================
+TOKEN = os.getenv("7924726725:AAFHAA_KbuNQEXf_AnS3V14ivINGUVCkNkc")
+CHAT_ID = int(os.getenv("-1003614623008"))
+
+CITY = "Algiers"
+COUNTRY = "DZ"
+TIMEZONE = "Africa/Algiers"
+GROUP_NAME = "🇩🇿фGosRaф🇩🇿"
+
+# =========================
+# 🕌 نصوص الأذان (بدون لمس)
+# =========================
+ADHAN_MESSAGES = {
+    "Fajr": "**🕌 أذان الفجر**\n**حان الآن موعد أذان الفجر بالجزائر**\nقوم يا قلبي صلّي 🤍",
+    "Dhuhr": "**🕌 أذان الظهر**\n**حان الآن موعد أذان الظهر بالجزائر**\nصلاتك خير من الدنيا 🌸",
+    "Asr": "**🕌 أذان العصر**\n**حان الآن موعد أذان العصر بالجزائر**\nما تنساش صلاتك 🤲",
+    "Maghrib": "**🕌 أذان المغرب**\n**حان الآن موعد أذان المغرب بالجزائر**\nقوموا صلوووا واذكروا الله 🍃",
+    "Isha": "**🕌 أذان العشاء**\n**حان الآن موعد أذان العشاء بالجزائر**\nاختم نهارك بالصلاة 🌙"
+}
+
+# =========================
+# 👋 الترحيب (بدون لمس)
+# =========================
+WELCOME_MESSAGES = [
+    """{name}
+😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
+يااااا مرحبااااااااااا 👀
+آه لا لا… استنى… وين راني؟ 🤔
+آه صح صح! راهو/راهي عضو جديد دخل لجروبنا {group} 🎉
+مرحبا بيك يا وليدي/بنيّتي 🤍
+اقعد اقعد… جيب/جيبي كرسي 🪑
+تحب/تحبي قهوة ☕ ولا ننساك ومنرجعلك بعد ساعتين؟ 😂
+راك بين ناسك،
+ضحك 🤣، قصرة 🗣، نقاشات 🔥
+وإذا شفتني نعاود نفس الهضرة 3 مرات… سامحني 😌
+الزهايمر دار حالة اليوم 🧠💨
+المهم:
+✋ احترم الناس
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
+😂 واضحك بلا حدود
+— الحاجة روميصة 🧕💚""",
+   """{name} 😎 واو! عضو جديد وصل!
+🤩 مرحبا بيك في {group} 
+☕ اجلس، خذ قهوة، وخلينا نضحك شوية 😆
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
+— الحاجة روميصة 🧕""",
+    """{name} 🤩 أهلاً بك!
+🌟 مرحبا في {group} 
+☕ خذ قهوتك، استرخي وخلينا نضحك سوا 😆
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
+— الحاجة روميصة 🧕"""
+]
+
+# =========================
+# 🕌 جلب أوقات الصلاة
+# =========================
+def get_prayer_times():
+    url = f"https://api.aladhan.com/v1/timingsByCity?city={CITY}&country={COUNTRY}&method=3"
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        timings = r.json()["data"]["timings"]
+        return {
+            "Fajr": timings["Fajr"],
+            "Dhuhr": timings["Dhuhr"],
+            "Asr": timings["Asr"],
+            "Maghrib": timings["Maghrib"],
+            "Isha": timings["Isha"]
+        }
+    except Exception as e:
+        print("⚠️ خطأ جلب الأذان:", e)
+        return {}
+
+# =========================
+# 🕌 إرسال الأذان
+# =========================
+async def send_adhan(app, prayer):
+    try:
+        await app.bot.send_message(
+            chat_id=CHAT_ID,
+            text=ADHAN_MESSAGES[prayer],
+            parse_mode=ParseMode.MARKDOWN
+        )
+        print(f"✅ أُرسل أذان {prayer}")
+    except Exception as e:
+        print(f"⚠️ خطأ أذان {prayer}:", e)
+
+# =========================
+# 🕋 الصلاة على النبي
+# =========================
+async def send_salat(app):
+    try:
+        image_path = os.path.join("images", "salat.png")
+
+        if not os.path.exists(image_path):
+            print("⚠️ الصورة غير موجودة")
+            return
+
+        with open(image_path, "rb") as img:
+            await app.bot.send_photo(
+                chat_id=CHAT_ID,
+                photo=img,
+                caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
+            )
+
+        print("✅ الصلاة على النبي أُرسلت")
+    except Exception as e:
+        print("⚠️ خطأ الصلاة:", e)
+
+# =========================
+# 👋 الترحيب
+# =========================
+async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    old_status = update.chat_member.old_chat_member.status
+    new_status = update.chat_member.new_chat_member.status
+
+    if old_status in ("left", "kicked") and new_status == "member":
+        user = update.chat_member.new_chat_member.user
+        text = random.choice(WELCOME_MESSAGES).format(
+            name=user.full_name,
+            group=GROUP_NAME
+        )
+        await update.effective_chat.send_message(text)
+        print(f"👋 تم الترحيب بـ {user.full_name}")
+
+# =========================
+# ▶️ أمر /start
+# =========================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message:
+        await update.message.reply_text("🧕 الحاجة روميصة راهي تخدم 🤍")
+
+# =========================
+# 🔹 جدولة أذان اليوم (دالة مساعدة)
+# =========================
+def schedule_prayers(scheduler, app):
+    prayers = get_prayer_times()
+    if not prayers:
+        print("⚠️ لم يتم جدولة الأذان (لا توجد أوقات)")
+        return
+
+    for prayer, time_str in prayers.items():
+        hour, minute = map(int, time_str.split(":"))
+        scheduler.add_job(
+            send_adhan,
+            "cron",
+            hour=hour,
+            minute=minute,
+            args=[app, prayer],
+            id=f"adhan_{prayer}",
+            replace_existing=True
+        )
+
+    print("🕌 تم تحديث وجدولة أوقات الأذان")
+
+# =========================
+# 🔄 عند تشغيل البوت
+# =========================
+async def on_startup(app):
+    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+
+    # إرسال الصلاة على النبي فور التشغيل
+    await send_salat(app)
+
+    # جدولة أذان اليوم
+    schedule_prayers(scheduler, app)
+
+    # تحديث الأذان يوميًا (00:05)
+    scheduler.add_job(
+        schedule_prayers,
+        "cron",
+        hour=0,
+        minute=5,
+        args=[scheduler, app],
+        id="daily_prayer_update",
+        replace_existing=True
+    )
+
+    # الصلاة على النبي كل ساعة
+    scheduler.add_job(
+        send_salat,
+        "interval",
+        hours=1,
+        args=[app],
+        id="hourly_salat",
+        replace_existing=True
+    )
+
+    scheduler.start()
+    print("🟢 البوت يعمل بثبات مع تحديث يومي للأذان")
+
+# =========================
+# 🚀 التشغيل
+# =========================
+def main():
+    app = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .post_init(on_startup)
+        .build()
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
+
+    print("🤖 Bot is running...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
