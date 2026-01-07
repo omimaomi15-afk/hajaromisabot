@@ -2,7 +2,6 @@ import random
 import requests
 import datetime
 import os
-import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update
 from telegram.ext import (
@@ -155,15 +154,11 @@ async def on_startup(app):
 # 🚀 التشغيل
 # =========================
 def main():
-    async def runner():
-        app = ApplicationBuilder().token(TOKEN).post_init(on_startup).build()
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
-        print("🤖 Bot is running...")
-        await app.run_polling()
-
-    import asyncio
-    asyncio.run(runner())
+    app = ApplicationBuilder().token(TOKEN).post_init(on_startup).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
+    print("🤖 Bot is running...")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
