@@ -2,7 +2,6 @@ import random
 import requests
 import datetime
 import os
-import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update
 from telegram.ext import (
@@ -32,46 +31,20 @@ ADHAN_MESSAGES = {
     "Isha": "**🕌 أذان العشاء**\n**حان الآن موعد أذان العشاء بالجزائر**\nاختم نهارك بالصلاة 🌙"
 }
 
-# صور لكل أذان
-ADHAN_IMAGES = {
-    "Fajr": os.path.join("images", "fajr.png"),
-    "Dhuhr": os.path.join("images", "dhuhr.png"),
-    "Asr": os.path.join("images", "asr.png"),
-    "Maghrib": os.path.join("images", "maghrib.png"),
-    "Isha": os.path.join("images", "isha.png")
-}
-
 # =========================
 # 👋 الترحيب
 # =========================
 WELCOME_MESSAGES = [
     """{name}
 😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
-يااااا مرحبااااااااااا 👀
-آه لا لا… استنى… وين راني؟ 🤔
 آه صح صح! راهو/راهي عضو جديد دخل لجروبنا {group} 🎉
-مرحبا بيك يا وليدي/بنيّتي 🤍
-اقعد اقعد… جيب/جيبي كرسي 🪑
-تحب/تحبي قهوة ☕ ولا ننساك ومنرجعلك بعد ساعتين؟ 😂
-راك بين ناسك،
-ضحك 🤣، قصرة 🗣، نقاشات 🔥
-وإذا شفتني نعاود نفس الهضرة 3 مرات… سامحني 😌
-الزهايمر دار حالة اليوم 🧠💨
-المهم:
-✋ احترم الناس
-👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
-😂 واضحك بلا حدود
-— الحاجة روميصة 🧕💚""",
-   """{name} 😎 واو! عضو جديد وصل!
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules""",
+    """{name} 😎 واو! عضو جديد وصل!
 🤩 مرحبا بيك في {group} 
-☕ اجلس، خذ قهوة، وخلينا نضحك شوية 😆
-👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
-— الحاجة روميصة 🧕""",
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules""",
     """{name} 🤩 أهلاً بك!
 🌟 مرحبا في {group} 
-☕ خذ قهوتك، استرخي وخلينا نضحك سوا 😆
-👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
-— الحاجة روميصة 🧕"""
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules"""
 ]
 
 # =========================
@@ -98,8 +71,8 @@ def get_prayer_times():
 # =========================
 async def send_adhan(app, prayer):
     try:
-        image_path = ADHAN_IMAGES.get(prayer)
-        if image_path and os.path.exists(image_path):
+        image_path = os.path.join("images", f"{prayer.lower()}.png")  # ضع صور الأذان في مجلد images
+        if os.path.exists(image_path):
             await app.bot.send_photo(
                 chat_id=CHAT_ID,
                 photo=open(image_path, "rb"),
@@ -115,20 +88,18 @@ async def send_adhan(app, prayer):
         print(f"⚠️ خطأ أذان {prayer}:", e)
 
 # =========================
-# 🕋 الصلاة على النبي
+# 🕋 الصلاة على النبي مع صورة
 # =========================
 async def send_salat(app):
     try:
         image_path = os.path.join("images", "salat.png")
-
-        await app.bot.send_photo(
-            chat_id=CHAT_ID,
-            photo=open(image_path, "rb"),
-            caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
-        )
-
-        print("✅ الصلاة على النبي أُرسلت مع صورة واحدة")
-
+        if os.path.exists(image_path):
+            await app.bot.send_photo(
+                chat_id=CHAT_ID,
+                photo=open(image_path, "rb"),
+                caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
+            )
+        print("✅ الصلاة على النبي أُرسلت")
     except Exception as e:
         print("⚠️ خطأ الصلاة:", e)
 
@@ -158,9 +129,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================
-# 🔄 جدولة الأذان والصلاة على النبي
+# 🔄 عند تشغيل البوت
 # =========================
-async def start_scheduler(app):
+async def on_startup(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
 
     # إرسال الصلاة على النبي فور التشغيل
@@ -175,26 +146,22 @@ async def start_scheduler(app):
     # جدولة الصلاة على النبي كل ساعة
     scheduler.add_job(send_salat, "interval", hours=1, args=[app])
     scheduler.start()
-
     print("🟢 البوت يعمل بثبات")
 
 # =========================
 # 🚀 التشغيل
 # =========================
-async def runner():
-    app = ApplicationBuilder().token(TOKEN).build()
+def main():
+    app = ApplicationBuilder() \
+        .token(TOKEN) \
+        .post_init(on_startup) \
+        .build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
 
-    # تشغيل المهام الخلفية بعد إنشاء التطبيق
-    asyncio.create_task(start_scheduler(app))
-
     print("🤖 Bot is running...")
-    await app.run_polling()
-
-def main():
-    asyncio.run(runner())
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
