@@ -32,8 +32,17 @@ ADHAN_MESSAGES = {
     "Isha": "**🕌 أذان العشاء**\n**حان الآن موعد أذان العشاء بالجزائر**\nاختم نهارك بالصلاة 🌙"
 }
 
+# صور لكل أذان
+ADHAN_IMAGES = {
+    "Fajr": os.path.join("images", "fajr.png"),
+    "Dhuhr": os.path.join("images", "dhuhr.png"),
+    "Asr": os.path.join("images", "asr.png"),
+    "Maghrib": os.path.join("images", "maghrib.png"),
+    "Isha": os.path.join("images", "isha.png")
+}
+
 # =========================
-# 👋 الترحيب (بدون لمس)
+# 👋 الترحيب
 # =========================
 WELCOME_MESSAGES = [
     """{name}
@@ -85,14 +94,22 @@ def get_prayer_times():
         return {}
 
 # =========================
-# 🕌 إرسال الأذان
+# 🕌 إرسال الأذان مع صورة
 # =========================
 async def send_adhan(app, prayer):
     try:
-        await app.bot.send_message(
-            chat_id=CHAT_ID,
-            text=ADHAN_MESSAGES[prayer]
-        )
+        image_path = ADHAN_IMAGES.get(prayer)
+        if image_path and os.path.exists(image_path):
+            await app.bot.send_photo(
+                chat_id=CHAT_ID,
+                photo=open(image_path, "rb"),
+                caption=ADHAN_MESSAGES[prayer]
+            )
+        else:
+            await app.bot.send_message(
+                chat_id=CHAT_ID,
+                text=ADHAN_MESSAGES[prayer]
+            )
         print(f"✅ أُرسل أذان {prayer}")
     except Exception as e:
         print(f"⚠️ خطأ أذان {prayer}:", e)
@@ -141,9 +158,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================
-# 🔄 عند تشغيل البوت
+# 🔄 جدولة الأذان والصلاة على النبي
 # =========================
-async def on_startup(app):
+async def start_scheduler(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
 
     # إرسال الصلاة على النبي فور التشغيل
@@ -170,8 +187,8 @@ async def runner():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
 
-    # تشغيل المهام الخلفية بدون post_init
-    asyncio.create_task(on_startup(app))
+    # تشغيل المهام الخلفية بعد إنشاء التطبيق
+    asyncio.create_task(start_scheduler(app))
 
     print("🤖 Bot is running...")
     await app.run_polling()
@@ -181,4 +198,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
