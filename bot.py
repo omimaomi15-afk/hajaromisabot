@@ -1,15 +1,9 @@
 import random
 import requests
-import datetime
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-    ChatMemberHandler
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ChatMemberHandler
 # =========================
 # 🔐 الإعدادات
 # =========================
@@ -21,7 +15,7 @@ TIMEZONE = "Africa/Algiers"
 GROUP_NAME = "🇩🇿фGosRaф🇩🇿"
 
 # =========================
-# 🕌 نصوص الأذان (بدون لمس)
+# 🕌 نصوص الأذان
 # =========================
 ADHAN_MESSAGES = {
     "Fajr": "**🕌 أذان الفجر**\n**حان الآن موعد أذان الفجر بالجزائر**\nقوم يا قلبي صلّي 🤍",
@@ -35,8 +29,7 @@ ADHAN_MESSAGES = {
 # 👋 الترحيب
 # =========================
 WELCOME_MESSAGES = [
-    """{name}
-😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
+    """{name} 😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
 آه صح صح! راهو/راهي عضو جديد دخل لجروبنا {group} 🎉
 👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules""",
     """{name} 😎 واو! عضو جديد وصل!
@@ -71,51 +64,40 @@ def get_prayer_times():
 # =========================
 async def send_adhan(app, prayer):
     try:
-        image_path = os.path.join("images", f"{prayer.lower()}.png")  # ضع صور الأذان في مجلد images
-        if os.path.exists(image_path):
-            await app.bot.send_photo(
-                chat_id=CHAT_ID,
-                photo=open(image_path, "rb"),
-                caption=ADHAN_MESSAGES[prayer]
-            )
-        else:
-            await app.bot.send_message(
-                chat_id=CHAT_ID,
-                text=ADHAN_MESSAGES[prayer]
-            )
+        image_path = os.path.join("images", f"{prayer}.png")  # ضع صور الأذان داخل مجلد images مع أسماء Fajr.png, Dhuhr.png...
+        await app.bot.send_photo(
+            chat_id=CHAT_ID,
+            photo=open(image_path, "rb"),
+            caption=ADHAN_MESSAGES[prayer]
+        )
         print(f"✅ أُرسل أذان {prayer}")
     except Exception as e:
         print(f"⚠️ خطأ أذان {prayer}:", e)
 
 # =========================
-# 🕋 الصلاة على النبي مع صورة
+# 🕋 الصلاة على النبي
 # =========================
 async def send_salat(app):
     try:
         image_path = os.path.join("images", "salat.png")
-        if os.path.exists(image_path):
-            await app.bot.send_photo(
-                chat_id=CHAT_ID,
-                photo=open(image_path, "rb"),
-                caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
-            )
-        print("✅ الصلاة على النبي أُرسلت")
+        await app.bot.send_photo(
+            chat_id=CHAT_ID,
+            photo=open(image_path, "rb"),
+            caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
+        )
+        print("✅ الصلاة على النبي أُرسلت مع صورة")
     except Exception as e:
         print("⚠️ خطأ الصلاة:", e)
 
 # =========================
-# 👋 الترحيب
+# 👋 الترحيب بالاعضاء
 # =========================
 async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     old_status = update.chat_member.old_chat_member.status
     new_status = update.chat_member.new_chat_member.status
-
     if old_status in ("left", "kicked") and new_status == "member":
         user = update.chat_member.new_chat_member.user
-        text = random.choice(WELCOME_MESSAGES).format(
-            name=user.full_name,
-            group=GROUP_NAME
-        )
+        text = random.choice(WELCOME_MESSAGES).format(name=user.full_name, group=GROUP_NAME)
         await update.effective_chat.send_message(text)
         print(f"👋 تم الترحيب بـ {user.full_name}")
 
@@ -124,18 +106,14 @@ async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
-        await update.message.reply_text(
-            "🧕 الحاجة روميصة راهي تخدم 🤍"
-        )
+        await update.message.reply_text("🧕 الحاجة روميصة راهي تخدم 🤍")
 
 # =========================
-# 🔄 عند تشغيل البوت
+# 🔄 جدولة الأذان والصلاة
 # =========================
 async def on_startup(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-
-    # إرسال الصلاة على النبي فور التشغيل
-    await send_salat(app)
+    await send_salat(app)  # إرسال الصلاة على النبي عند تشغيل البوت
 
     # جدولة الأذان
     prayers = get_prayer_times()
@@ -151,19 +129,16 @@ async def on_startup(app):
 # =========================
 # 🚀 التشغيل
 # =========================
-def main():
-    app = ApplicationBuilder() \
-        .token(TOKEN) \
-        .post_init(on_startup) \
-        .build()
-
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
-
-    print("🤖 Bot is running...")
-    app.run_polling()
+    await on_startup(app)
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
+
 
 
