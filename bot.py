@@ -19,6 +19,7 @@ CITY = "Algiers"
 COUNTRY = "DZ"
 TIMEZONE = "Africa/Algiers"
 GROUP_NAME = "🇩🇿фGosRaф🇩🇿"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # الرابط الكامل للـ Render service مع HTTPS
 
 # =========================
 # 🕌 نصوص الأذان
@@ -28,14 +29,14 @@ ADHAN_MESSAGES = {
     "Dhuhr": "**🕌 أذان الظهر**\n**حان الآن موعد أذان الظهر بالجزائر**\nصلاتك خير من الدنيا 🌸",
     "Asr": "**🕌 أذان العصر**\n**حان الآن موعد أذان العصر بالجزائر**\nما تنساش صلاتك 🤲",
     "Maghrib": "**🕌 أذان المغرب**\n**حان الآن موعد أذان المغرب بالجزائر**\nقوموا صلوووا واذكروا الله 🍃",
-    "Isha": "**🕌 أذان العشاء**\n**حان الآن موعد أذان العشاء بالجزائر**\nاختم نهارك بالصلاة 🌙",
+    "Isha": "**🕌 أذان العشاء**\n**حان الآن موعد أذان العشاء بالجزائر**\nاختم نهارك بالصلاة 🌙"
 }
 
 # =========================
 # 👋 الترحيب
 # =========================
 WELCOME_MESSAGES = [
-   """{name}
+    """{name}
 😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
 يااااا مرحبااااااااااا 👀
 آه لا لا… استنى… وين راني؟ 🤔
@@ -77,7 +78,7 @@ def get_prayer_times():
             "Dhuhr": timings["Dhuhr"],
             "Asr": timings["Asr"],
             "Maghrib": timings["Maghrib"],
-            "Isha": timings["Isha"],
+            "Isha": timings["Isha"]
         }
     except Exception as e:
         print("⚠️ خطأ جلب الأذان:", e)
@@ -89,17 +90,11 @@ def get_prayer_times():
 async def send_adhan(app, prayer):
     try:
         image_path = os.path.join("images", f"{prayer}.png")
-        if os.path.exists(image_path):
-            await app.bot.send_photo(
-                chat_id=CHAT_ID,
-                photo=open(image_path, "rb"),
-                caption=ADHAN_MESSAGES[prayer],
-            )
-        else:
-            await app.bot.send_message(
-                chat_id=CHAT_ID,
-                text=ADHAN_MESSAGES[prayer],
-            )
+        await app.bot.send_photo(
+            chat_id=CHAT_ID,
+            photo=open(image_path, "rb"),
+            caption=ADHAN_MESSAGES[prayer]
+        )
         print(f"✅ أُرسل أذان {prayer}")
     except Exception as e:
         print(f"⚠️ خطأ أذان {prayer}:", e)
@@ -110,33 +105,24 @@ async def send_adhan(app, prayer):
 async def send_salat(app):
     try:
         image_path = os.path.join("images", "salat.png")
-        if os.path.exists(image_path):
-            await app.bot.send_photo(
-                chat_id=CHAT_ID,
-                photo=open(image_path, "rb"),
-                caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹",
-            )
-        else:
-            await app.bot.send_message(
-                chat_id=CHAT_ID,
-                text="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹",
-            )
-        print("✅ الصلاة على النبي أُرسلت")
+        await app.bot.send_photo(
+            chat_id=CHAT_ID,
+            photo=open(image_path, "rb"),
+            caption="اللهم صل وسلم وبارك على نبينا محمد ﷺ 🌹"
+        )
+        print("✅ الصلاة على النبي أُرسلت مع صورة")
     except Exception as e:
         print("⚠️ خطأ الصلاة:", e)
 
 # =========================
-# 👋 الترحيب بالأعضاء
+# 👋 الترحيب بالاعضاء
 # =========================
 async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     old_status = update.chat_member.old_chat_member.status
     new_status = update.chat_member.new_chat_member.status
-
     if old_status in ("left", "kicked") and new_status == "member":
         user = update.chat_member.new_chat_member.user
-        text = random.choice(WELCOME_MESSAGES).format(
-            name=user.full_name, group=GROUP_NAME
-        )
+        text = random.choice(WELCOME_MESSAGES).format(name=user.full_name, group=GROUP_NAME)
         await update.effective_chat.send_message(text)
         print(f"👋 تم الترحيب بـ {user.full_name}")
 
@@ -148,43 +134,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🧕 الحاجة روميصة راهي تخدم 🤍")
 
 # =========================
-# 🔄 عند تشغيل البوت
+# 🔄 جدولة الأذان والصلاة
 # =========================
 async def on_startup(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-
     await send_salat(app)
 
     prayers = get_prayer_times()
     for prayer, time_str in prayers.items():
         hour, minute = map(int, time_str.split(":"))
-        scheduler.add_job(
-            send_adhan,
-            "cron",
-            hour=hour,
-            minute=minute,
-            args=[app, prayer],
-        )
+        scheduler.add_job(send_adhan, "cron", hour=hour, minute=minute, args=[app, prayer])
 
     scheduler.add_job(send_salat, "interval", hours=1, args=[app])
     scheduler.start()
     print("🟢 البوت يعمل بثبات")
 
 # =========================
-# 🚀 التشغيل (صحيح 100%)
+# 🚀 Webhook التشغيل
 # =========================
-def main():
-    app = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .post_init(on_startup)
-        .build()
-    )
-
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
+    await on_startup(app)
 
-    app.run_polling()
+    # إعداد Webhook
+    await app.bot.set_webhook(WEBHOOK_URL)
+    print(f"🟢 البوت جاهز على Webhook: {WEBHOOK_URL}")
+
+    # لا حاجة لـ run_polling في Webhook
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()  # Polling داخلي فقط لأجل scheduler
+    await app.updater.wait_closed()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
