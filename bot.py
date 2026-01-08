@@ -1,14 +1,11 @@
 import random
 import requests
 import os
+import asyncio
+from flask import Flask, request
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-    ChatMemberHandler,
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ChatMemberHandler
 
 # =========================
 # 🔐 الإعدادات
@@ -19,7 +16,8 @@ CITY = "Algiers"
 COUNTRY = "DZ"
 TIMEZONE = "Africa/Algiers"
 GROUP_NAME = "🇩🇿фGosRaф🇩🇿"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # الرابط الكامل للـ Render service مع HTTPS
+WEBHOOK_PATH = f"/{TOKEN}"
+PORT = int(os.environ.get("PORT", 10000))
 
 # =========================
 # 🕌 نصوص الأذان
@@ -136,38 +134,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 # 🔄 جدولة الأذان والصلاة
 # =========================
-async def on_startup(app):
+async def schedule_jobs(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
     await send_salat(app)
-
     prayers = get_prayer_times()
     for prayer, time_str in prayers.items():
         hour, minute = map(int, time_str.split(":"))
         scheduler.add_job(send_adhan, "cron", hour=hour, minute=minute, args=[app, prayer])
-
     scheduler.add_job(send_salat, "interval", hours=1, args=[app])
     scheduler.start()
     print("🟢 البوت يعمل بثبات")
 
 # =========================
-# 🚀 Webhook التشغيل
+# === إعداد Flask للتعامل مع Webhook ===
 # =========================
-async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
-    await on_startup(app)
+flask_app = Flask(__name__)
+telegram_app = ApplicationBuilder().token(TOKEN).build()
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
 
-    # إعداد Webhook
-    await app.bot.set_webhook(WEBHOOK_URL)
-    print(f"🟢 البوت جاهز على Webhook: {WEBHOOK_URL}")
+@flask_app.route(WEBHOOK_PATH, methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+    asyncio.run(telegram_app.update_queue.put(update))
+    return "OK"
 
-    # لا حاجة لـ run_polling في Webhook
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()  # Polling داخلي فقط لأجل scheduler
-    await app.updater.wait_closed()
+async def main_async():
+    await telegram_app.initialize()
+    await schedule_jobs(telegram_app)
+    await telegram_app.start()
+    print("🟢 البوت جاهز ويعمل")
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    asyncio.run(main_async())
+    flask_app.run(host="0.0.0.0", port=PORT)
