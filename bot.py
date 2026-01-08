@@ -3,7 +3,12 @@ import requests
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ChatMemberHandler
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    ChatMemberHandler,
+)
 
 # =========================
 # 🔐 الإعدادات
@@ -14,7 +19,6 @@ CITY = "Algiers"
 COUNTRY = "DZ"
 TIMEZONE = "Africa/Algiers"
 GROUP_NAME = "🇩🇿фGosRaф🇩🇿"
-
 
 # =========================
 # 🕌 نصوص الأذان
@@ -31,17 +35,34 @@ ADHAN_MESSAGES = {
 # 👋 الترحيب
 # =========================
 WELCOME_MESSAGES = [
-    """{name} 😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
+   """{name}
+😂🧕 الحاجة روميصة ترحّب بيك! 🧕😂
+يااااا مرحبااااااااااا 👀
+آه لا لا… استنى… وين راني؟ 🤔
 آه صح صح! راهو/راهي عضو جديد دخل لجروبنا {group} 🎉
-👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules""",
-    """{name} 😎 واو! عضو جديد وصل!
+مرحبا بيك يا وليدي/بنيّتي 🤍
+اقعد اقعد… جيب/جيبي كرسي 🪑
+تحب/تحبي قهوة ☕ ولا ننساك ومنرجعلك بعد ساعتين؟ 😂
+راك بين ناسك،
+ضحك 🤣، قصرة 🗣، نقاشات 🔥
+وإذا شفتني نعاود نفس الهضرة 3 مرات… سامحني 😌
+الزهايمر دار حالة اليوم 🧠💨
+المهم:
+✋ احترم الناس
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
+😂 واضحك بلا حدود
+— الحاجة روميصة 🧕💚""",
+   """{name} 😎 واو! عضو جديد وصل!
 🤩 مرحبا بيك في {group} 
-👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules""",
+☕ اجلس، خذ قهوة، وخلينا نضحك شوية 😆
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
+— الحاجة روميصة 🧕""",
     """{name} 🤩 أهلاً بك!
 🌟 مرحبا في {group} 
-👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules"""
+☕ خذ قهوتك، استرخي وخلينا نضحك سوا 😆
+👀 اقرا/اقراي القوانين (عند عمك الشرطي)👈 /rules
+— الحاجة روميصة 🧕"""
 ]
-
 # =========================
 # 🕌 جلب أوقات الصلاة
 # =========================
@@ -66,13 +87,22 @@ def get_prayer_times():
 # =========================
 async def send_adhan(app, prayer):
     try:
-        image_path = os.path.join("images", f"{prayer}.png")  # ضع صور الأذان داخل مجلد images مع أسماء Fajr.png, Dhuhr.png...
-        await app.bot.send_photo(
-            chat_id=CHAT_ID,
-            photo=open(image_path, "rb"),
-            caption=ADHAN_MESSAGES[prayer]
-        )
+        image_path = os.path.join("images", f"{prayer}.png")
+
+        if os.path.exists(image_path):
+            await app.bot.send_photo(
+                chat_id=CHAT_ID,
+                photo=open(image_path, "rb"),
+                caption=ADHAN_MESSAGES[prayer]
+            )
+        else:
+            await app.bot.send_message(
+                chat_id=CHAT_ID,
+                text=ADHAN_MESSAGES[prayer]
+            )
+
         print(f"✅ أُرسل أذان {prayer}")
+
     except Exception as e:
         print(f"⚠️ خطأ أذان {prayer}:", e)
 
@@ -92,56 +122,73 @@ async def send_salat(app):
         print("⚠️ خطأ الصلاة:", e)
 
 # =========================
-# 👋 الترحيب بالاعضاء
+# 👋 الترحيب بالأعضاء
 # =========================
 async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     old_status = update.chat_member.old_chat_member.status
     new_status = update.chat_member.new_chat_member.status
     if old_status in ("left", "kicked") and new_status == "member":
         user = update.chat_member.new_chat_member.user
-        text = random.choice(WELCOME_MESSAGES).format(name=user.full_name, group=GROUP_NAME)
+        text = random.choice(WELCOME_MESSAGES).format(
+            name=user.full_name,
+            group=GROUP_NAME
+        )
         await update.effective_chat.send_message(text)
-        print(f"👋 تم الترحيب بـ {user.full_name}")
 
 # =========================
-# ▶️ أمر /start
+# ▶️ /start
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
         await update.message.reply_text("🧕 الحاجة روميصة راهي تخدم 🤍")
 
 # =========================
-# 🔄 جدولة الأذان والصلاة
+# 🔄 post_init (تشغيل مرة واحدة)
 # =========================
 async def on_startup(app):
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-    await send_salat(app)  # إرسال الصلاة على النبي عند تشغيل البوت
 
-    # جدولة الأذان
+    await send_salat(app)
+
     prayers = get_prayer_times()
     for prayer, time_str in prayers.items():
         hour, minute = map(int, time_str.split(":"))
-        scheduler.add_job(send_adhan, "cron", hour=hour, minute=minute, args=[app, prayer])
+        scheduler.add_job(
+            send_adhan,
+            "cron",
+            hour=hour,
+            minute=minute,
+            args=[app, prayer],
+            id=f"adhan_{prayer}",
+            replace_existing=True
+        )
 
-    # جدولة الصلاة على النبي كل ساعة
-    scheduler.add_job(send_salat, "interval", hours=1, args=[app])
+    scheduler.add_job(
+        send_salat,
+        "interval",
+        hours=1,
+        args=[app],
+        id="salat_hourly",
+        replace_existing=True
+    )
+
     scheduler.start()
     print("🟢 البوت يعمل بثبات")
 
 # =========================
 # 🚀 التشغيل
 # =========================
-async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+def main():
+    app = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .post_init(on_startup)
+        .build()
+    )
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(ChatMemberHandler(welcome_member, ChatMemberHandler.CHAT_MEMBER))
-    await on_startup(app)
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
-
-
-
-
+    main()
