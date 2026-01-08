@@ -4,6 +4,7 @@ import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ChatMemberHandler
+
 # =========================
 # 🔐 الإعدادات
 # =========================
@@ -13,6 +14,7 @@ CITY = "Algiers"
 COUNTRY = "DZ"
 TIMEZONE = "Africa/Algiers"
 GROUP_NAME = "🇩🇿фGosRaф🇩🇿"
+
 
 # =========================
 # 🕌 نصوص الأذان
@@ -139,6 +141,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
